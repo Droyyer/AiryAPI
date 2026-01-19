@@ -19,7 +19,7 @@ You are welcome to report all occurrences of bugs either in issues on this repos
 
 ## Usage
 In most cases, you'll want to set a modelpart as your primary chamber (Secondary chambers will only work independently while one of their ancestor modelparts is scaled if said ancestor is the main chamber):
-```
+```lua
 -- All examples will assume that the declaration of API is "airyapi"
 airyapi:setMainChamber(models.model_file.main_chamber_modelpart)
 ```
