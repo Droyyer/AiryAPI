@@ -78,11 +78,19 @@ airyapi.disableBuiltInScaling = true
 
 ### Other Useful Stuff:
 `defaultDeflationSpeed` - All new valves without own deflation speed will default to this
+
 `defaultValveHitboxSize` - All new valves without own hitbox size will default to this
+
 `interactionRange` - How close a player has to be to interact with the valves
+
 `increaseDeflationPitch` - Whether or not opening multiple valves at once will slightly increase the pitch of the deflation sound
+
 `airHudColor` - The color of the generated GUI elements in their default state
+
 `airHudDeflatingColor` - The color of GUI elements when their respective chamber is losing air
+
 `syncCooldown` - How often the script will send sync pings to synchronize values to players who loaded the avatar after values had already been changed
+
 `setValveInteractionSound(sound?: string, volume?: number, pitch?: number)` - Changes the sound that plays when a valve is opened or closed
+
 `setReinflationSound(sound?: string, volume?: number, pitch?: number)` - Changes the sound that plays when the user reverts all air values back to maximum
