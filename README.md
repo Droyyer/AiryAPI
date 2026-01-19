@@ -39,7 +39,7 @@ airyapi:newValve(
 ```
 
 Adding secondary chambers can be done through `newChamber(modelpart: ModelPart, name?: string)` method, which can also be called right in the middle of `newValve` method as the fourth argument:
-```
+```lua
 airyapi:newValve(
 
     models.model_file.path.to.valve.SecondaryValve, 
@@ -57,22 +57,22 @@ airyapi:newValve(
 
 **While this is enough for functional interactive values, additional setup is advised, such as**:
 Adding a deflation sound using `setDeflationSound(sound: string|Sound, volume?: number, pitch?: number, attenuation?: number, subtitle?: string)` method, otherwise there will be none:
-```
+```lua
 airyapi:setDeflationSound("sound_id_or_file", 0.875, 1.1) -- All further arguments can be skipped if you don't have the need to provide them
 ```
 Generating an action wheel page through `generateAiryPage(parentPage?: Page)` method to have easy control over aspects of the API in the game:
-```
+```lua
 airyapi:generateAiryPage(mainPage) -- The generated page will be assumed as the main page of the action wheel if you don't provide one
 ```
 <sub>Or you can code your custom interface, whatever works best for you</sub>
 
 Generating UI/Hud elements with the `generateAirHuds(posX?: number, posY?: number, scale?: number)` method to view air values of chambers:
-```
+```lua
 airyapi:generateAirHuds(-10, -10, 0.75) -- Position values are generally negative as [0;0] is the top left corner of your screen
 ```
 
 The API has built-in modelpart scaling code, so if you wish to write your own based on API's values, you need to disable the scaling by setting `disableBuiltInScaling` to `true`:
-```
+```lua
 airyapi.disableBuiltInScaling = true
 ```
 
