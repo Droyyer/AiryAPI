@@ -1,4 +1,4 @@
---    AiryAPI v0.0.0 by: Dyrris__ / dyrris_agni
+--    AiryAPI v0.1.1 by: Dyrris__ / dyrris_agni
 --
 --    !WARNING!
 --    While I deem this version of the API "functional", calling it stable and coherent would be a stretch.
@@ -708,7 +708,7 @@ local function newAirHud(chamber, posX, posY, scale)
 
     airHud.hud = airyapi.AirHudGroup:newText("AirHud"..chamber.name)
         :setText('{"text":"' .. chamber.name .. ' Air: '.. math.round(chamber.air * 1000) / 10 ..'%","color":"'.. airyapi.airHudColor ..'"}')
-        :setPos(not client:isModLoaded("xaerominimap") and vec((posX or 0) + currentHudOffsetX, (posY or 0) + currentHudOffsetY, 0) or vec(-6, -110, 0))
+        :setPos(vec((posX or 0) + currentHudOffsetX, (posY or 0) + currentHudOffsetY, 0))
         :setScale(scale or 1)
         :setOutline(true)
         :setOutlineColor(vectors.hexToRGB(airyapi.airHudColor) / 5)
