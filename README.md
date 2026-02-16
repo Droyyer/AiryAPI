@@ -76,12 +76,26 @@ The API has built-in modelpart scaling code, so if you wish to write your own ba
 airyapi.disableBuiltInScaling = true
 ```
 
+There is also an experimental feature that offsets the camera based on the air left in main chamber that can be enabled by setting `disableCameraOffset` to `false`:
+```
+airyapi.disableCameraOffset = false
+```
+(The feature is slightly wonky and will likely not work as intended if the camera is affected by any other script)
+
 ### Other Useful Stuff:
+`disableInteractions` - Disables all valve interactions. Can be changed through a built-in action, too
+
+`extraValveInteractCheck` - This function will run every time a valve interaction check is ran as if it was a part of the check (The interaction is cancelled if return is not truthy)
+
+`cameraOffsetOverride` - This function will run every time the script attempts to affect the camera offset. If returned truthy, the camera won't be offset. If returned Vector3, the camera will be offset to that vector instead
+
 `defaultDeflationSpeed` - All new valves without own deflation speed will default to this
 
 `defaultValveHitboxSize` - All new valves without own hitbox size will default to this
 
 `interactionRange` - How close a player has to be to interact with the valves
+
+`rootScale` - The API will treat the avatar to be of this scale. Use this when you affect the entire avatar's scale with `setScale`
 
 `increaseDeflationPitch` - Whether or not opening multiple valves at once will slightly increase the pitch of the deflation sound
 
