@@ -1,9 +1,10 @@
---    AiryAPI v0.1.1 by: Dyrris__ / dyrris_agni
+--    AiryAPI v0.2.0 by: Dyrris__ / dyrris_agni
 --
 --    !WARNING!
 --    While I deem this version of the API "functional", calling it stable and coherent would be a stretch.
 --    It may break in unexplainable ways, lack documentation in important places, or just behave weird.
---    You are welcome to report all occurrences of bugs in my discord direct messages.
+--    You are welcome to report all occurrences of bugs either in issues on this repository or in my discord direct messages.
+--    Ideas/suggestions are also welcome.
 --
 --    A figura API meant for creation of interactive valves and air chambers for things such as pooltoys, balloons, and other airfilled objects/critters
 
@@ -19,15 +20,22 @@ airyapi.defaultValveHitboxSize = 4    -- (4) The cube area (size*size*size) that
 airyapi.interactionRange = 3.5    -- (3.5) How close (In blocks) a player has to be to be to interact with valves on you
 airyapi.deflationSpeedModifier = 1    -- (1) Technically not a configuration value and is changed (or intended to be) with an action during runtime, but eh. Modifies the speed of all deflation values
 
-airyapi.disableBuiltInScaling = false    -- (false) Makes the API not scale the model on its own. Set this to true if you intend to run scale logic on your own (Eg. using a squish/wobble-like script)
+airyapi.disableInteractions = false    --(false) Prevents others from interacting with the valves
+airyapi.disableBuiltInScaling = false    -- (false) Prevents the API from scaling the model on its own. Set this to true if you intend to run scale logic on your own (Eg. using a squish/wobble-like script)
+airyapi.disableCameraOffset = true    -- (true) Prevents the API from offsetting your camera pivot depending on the air left in main chamber. True by default
+
+airyapi.rootScale = 1    -- (1) Scale of the model that affects some of the built-in scaling features. Edit this if you're using setScale method to edit the size of your avatar
 
 airyapi.increaseDeflationPitch = true    -- (true) Increases the pitch of the deflation sound if multiple valves are open at once. Limits at 4 valves (1.15 pitch) unless reconfigured
 
 airyapi.airHudColor = "#00BBFF"    -- ("#00BBFF") Default color of AirHuds
 airyapi.airHudDeflatingColor = "#CF1D3B"    -- ("#CF1D3B") Color of AirHuds if one of the chamber's valves is open
 
-airyapi.syncCooldown = 200    -- (200) How often a sync ping will be made (Meant to synchronize your data to other users if they loaded you later)
+airyapi.syncCooldown = 200    -- (200) How often a sync ping will be made (Meant to synchronize your data to other users if they loaded you later or whatever)
 
+
+airyapi.extraValveInteractCheck = nil    -- (nil) A function that is ran during a valve interaction check. The check will be cancelled if this function returns false at that point in time
+airyapi.cameraOffsetOverride = nil    -- (nil) A function that cancels this script's camera offset functionality if it returns true at that point in time. If a Vector3 is returned, offsets the camera by that vector instead
 
 
 
@@ -77,8 +85,8 @@ end
 ---@param attenuation number?
 ---@param subtitle string?
 function airyapi:setDeflationSound(sound, volume, pitch, attenuation, subtitle)
-
-    if type(sound) == "userdata" then
+    
+    if type(sound) == "Sound" then
 
         sound:setLoop(true)
 
@@ -150,18 +158,47 @@ metachamber.__index = metachamber
 ---Applies the scale to the modelpart this chamber is attached to
 ---@param self table
 function metachamber.applyScale(self)
-    
-        if airyapi.disableBuiltInScaling then return end
 
         if self.isMain then
 
-            self.modelpart:setScale(
-                1 + (1 - self.air) * 0.075,
-                self.air,
-                1 + (1 - self.air) * 0.075
-            )
+            if not airyapi.disableBuiltInScaling then
+
+                self.modelpart:setScale(
+                    1 + (1 - self.air) * 0.075 * airyapi.rootScale,
+                    self.air * airyapi.rootScale,
+                    1 + (1 - self.air) * 0.075 * airyapi.rootScale
+                )
+            
+            end
+            
+            if host:isHost() and not airyapi.disableCameraOffset then
+
+                local offset = vec(0, 0, 0)
+                local override = airyapi.cameraOffsetOverride and airyapi.cameraOffsetOverride()
+
+                
+                if not override then
+
+                    offset.y = (airyapi.rootScale - 1) * player:getEyeHeight() - (1 - self.air) * airyapi.rootScale * player:getEyeHeight()
+
+                elseif type(override) == "Vector3" then
+
+                    offset = override
+
+                else
+
+                    return
+
+                end
+
+                renderer:setOffsetCameraPivot(offset)
+                renderer:setEyeOffset(offset)
+
+            end
 
         else
+
+            if airyapi.disableBuiltInScaling then return end
 
             local mainAir = airyapi.mainChamber.air
 
@@ -228,10 +265,15 @@ end
 function pings.reinflateAllChambers()
     
     airyapi.mainChamber.air = 1.00
+    airyapi.mainChamber:applyScale()
 
     for _, chamber in pairs(airyapi.secondaryChambers) do
+
         chamber.air = 1.00
+        chamber:applyScale()
+
     end
+
 
     
     if not player:isLoaded() then return end
@@ -244,11 +286,11 @@ end
 
 function pings.reinflateChamber(chamberName)
     
-    if chamberName == airyapi.mainChamber.name then
-        airyapi.mainChamber.air = 1.00
-    else
-        airyapi.secondaryChambers[chamberName].air = 1.00
-    end
+    local chamber = chamberName == airyapi.mainChamber.name and airyapi.mainChamber or airyapi.secondaryChambers[chamberName]
+
+    chamber.air = 1.00
+    chamber:applyScale()
+
 
 
     if not player:isLoaded() then return end
@@ -271,6 +313,7 @@ airyapi.valves = {} ---@type valve[]
 ---@field chamber chamber
 ---@field hitboxSize number
 ---@field isOpen boolean
+---@field isLocked boolean
 ---@field isOnMainChamber boolean    -- Idfk how heavy modelpart to modelpart comparison is so this exists, fun!
 
 
@@ -306,6 +349,7 @@ function airyapi:newValve(modelpart, name, animation, chamber, deflationSpeed, h
 
         -- Field initiation
         isOpen = false,
+        isLocked = false,
         isOnMainChamber = chamber and false or true
         
     }
@@ -338,15 +382,17 @@ function metavalve:decreaseAir()
     chamber.air = math.clamp(chamber.air - (totalDeflationSpeed * 0.5 * math.max(chamber.air, 0.5)^2 + totalDeflationSpeed * 0.5), 0.05, 1)
 
     
-    
-    if airyapi.disableBuiltInScaling then return end
 
     chamber:applyScale()
 
+    if airyapi.disableBuiltInScaling then return end    -- Main chamber still receives the applyScale check to offset the camera if needed
+
     if self.isOnMainChamber and airyapi.secondaryChambers then
+
         for _, secondaryChamber in pairs(airyapi.secondaryChambers) do
             secondaryChamber:applyScale()
         end
+
     end
 
 end
@@ -397,8 +443,10 @@ local function canOpenValve(otherPlayer)
         and (otherPlayer:getPos() - player:getPos()):length() < airyapi.interactionRange
         
         and otherPlayer:getHeldItem().id == "minecraft:air"
-        
-        
+
+        and otherPlayer:getSwingTime() == 1
+
+        and (not airyapi.extraValveInteractCheck or airyapi.extraValveInteractCheck())
 
 end
 
@@ -445,8 +493,12 @@ airyapi.airyPage = nil ---@type Page Intentionally left as empty as to not gener
 airyapi.valveActions = {} ---@type Action[]
 
 airyapi.miscActions = {} ---@type Action[]
-local chamberIndexToKey = {}
+
+local chamberIndexToKey = {} ---@type table<number, string>
 local selectedChamberIndex = 1
+
+local valveIndexToKey = {} ---@type table<number, string>
+local selectedValveIndex = 1
 
 local newDeflationSpeedModifier = airyapi.deflationSpeedModifier
 
@@ -555,6 +607,26 @@ local function createMiscActions()
         end
 
     end
+
+
+
+    for _, valve in pairs(airyapi.valves) do
+
+        local isPresent = false
+        for _, valveName_ in pairs(valveIndexToKey) do
+            if valve == valveName_ then
+                isPresent = true
+                break
+            end
+        end
+
+        if not isPresent then
+            valveIndexToKey[#valveIndexToKey+1] = valve.name
+        end
+
+    end
+
+
     
 
     if not airyapi.miscActions["AllChambers"] then
@@ -595,6 +667,71 @@ local function createMiscActions()
 
     end
 
+
+
+
+    if not airyapi.miscActions["DisableInteractions"] then
+
+        local disableInteractionsAction
+        disableInteractionsAction = airyapi.airyPage:newAction()
+            :setTitle(not airyapi.disableInteractions and "Disable Interactions" or "Enable Interactions")
+            :setItem(not airyapi.disableInteractions and "minecraft:lantern" or "minecraft:soul_lantern")
+            :setColor(vectors.hexToRGB("#68194E"))
+            :setHoverColor(vectors.hexToRGB("#DF61A0"))
+
+            :onLeftClick(function ()
+
+                airyapi.disableInteractions = not airyapi.disableInteractions
+
+                disableInteractionsAction:setTitle(not airyapi.disableInteractions and "Disable Interactions" or "Enable Interactions")
+                disableInteractionsAction:setItem(not airyapi.disableInteractions and "minecraft:lantern" or "minecraft:soul_lantern")
+
+            end)
+
+        airyapi.miscActions["DisableInteractions"] = disableInteractionsAction
+
+    end
+
+
+    if not airyapi.miscActions["LockValve"] then
+        
+        local lockValveAction
+        lockValveAction = airyapi.airyPage:newAction()
+            :setTitle("Lock ".. valveIndexToKey[selectedValveIndex] .." Valve")
+            :setItem("minecraft:tripwire_hook")
+            :setColor(vectors.hexToRGB("#555258"))
+            :setHoverColor(vectors.hexToRGB("#AEACAF"))
+
+            :onScroll(function (dir)
+                
+                selectedValveIndex = (selectedValveIndex + dir - 1) % #valveIndexToKey + 1
+
+                local valve = airyapi.valves[valveIndexToKey[selectedChamberIndex]]
+
+                lockValveAction:setTitle((not valve.isLocked and "Lock " or "Unlock ").. valveIndexToKey[selectedValveIndex] .." Valve")
+                lockValveAction:setItem(not valve.isLocked and "minecraft:tripwire_hook" or "minecraft:redstone_torch")
+
+            end)
+
+            :onLeftClick(function ()
+                
+                local valve = airyapi.valves[valveIndexToKey[selectedValveIndex]]
+
+                valve.isLocked = not valve.isLocked
+
+
+                lockValveAction:setTitle((not valve.isLocked and "Lock " or "Unlock ").. valveIndexToKey[selectedValveIndex] .." Valve")
+                lockValveAction:setItem(not valve.isLocked and "minecraft:tripwire_hook" or "minecraft:redstone_torch")
+
+            end)
+
+        airyapi.miscActions["LockValve"] = lockValveAction
+
+    end
+
+
+    
+
     if not airyapi.miscActions["ModifyDeflationSpeed"] then
 
         local modifyDeflationSpeedAction
@@ -617,6 +754,8 @@ local function createMiscActions()
                 modifyDeflationSpeedAction:setTitle("Deflation Speed Modifier: " .. newDeflationSpeedModifier)
 
             end)
+
+        airyapi.miscActions["ModifyDeflationSpeed"] = modifyDeflationSpeedAction
 
     end
 
@@ -804,11 +943,11 @@ end
 
 local function runValveInteraction()
 
+    if airyapi.disableInteractions then return end
+
     for _, otherPlayer in pairs(world.getPlayers()) do    -- Totally won't be a problem on big servers! (To be fair players too far away are excluded from most calculations)
 
-        if canOpenValve(otherPlayer) and otherPlayer:getSwingTime() == 1
-        
-        then
+        if canOpenValve(otherPlayer) then
 
             local valveAabbs, valveIndexToKey = getValveAabbs()
 
@@ -820,13 +959,17 @@ local function runValveInteraction()
             if valveHit then
 
                 local valveName = valveIndexToKey[valveHit]
+                local valve = airyapi.valves[valveName]
 
-                pings.ToggleValve(valveName, not airyapi.valves[valveName].isOpen)
-                toggleValveAction(valveName, not airyapi.valves[valveName].isOpen)
+                if valve.isLocked then return end
+
+                pings.ToggleValve(valveName, not valve.isOpen)
+                toggleValveAction(valveName, not valve.isOpen)
 
             end
 
         end
+
     end
 
 end
@@ -856,7 +999,8 @@ local function runDeflation()
     if not deflationSound then return end
     if openValveCount > 0 then
         
-        deflationSound:setPos(player:getPos()):setPitch(getDeflationPitch(openValveCount))
+        deflationSound:setPos(player:getPos())
+        if airyapi.increaseDeflationPitch then deflationSound:setPitch(getDeflationPitch(openValveCount)) end
 
         if not deflationSound:isPlaying() then deflationSound:play() end
 
